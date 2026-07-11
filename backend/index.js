@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import connectDB from './src/config/db.config.js';
 import researchRoutes from './src/routes/research.routes.js';
+import debateRoutes from './src/routes/debate.routes.js';
 
 // Load environment variables
 dotenv.config();
@@ -19,6 +20,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api', researchRoutes);
+app.use('/api', debateRoutes);
 
 // Basic Route for testing
 app.get('/api/health', (req, res) => {

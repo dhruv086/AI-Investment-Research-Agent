@@ -3,6 +3,7 @@ import runResearchAgent from '../agents/research.agent.js';
 import runBullAgent from '../agents/bull.agent.js';
 import runBearAgent from '../agents/bear.agent.js';
 import runRiskAgent from '../agents/risk.agent.js';
+import runJudgeAgent from '../agents/judge.agent.js';
 
 // Define the debate graph State using LangGraph Annotations
 export const DebateState = Annotation.Root({
@@ -44,9 +45,14 @@ const riskNode = async (state) => {
 };
 
 const judgeNode = async (state) => {
-  console.log('>>> [GRAPH NODE: JudgeNode (Stub)] Executing pass-through...');
-  // Pass-through stub for Phase 3
-  return {};
+  console.log('>>> [GRAPH NODE: JudgeNode] Executing...');
+  const result = await runJudgeAgent(state);
+  return {
+    verdict: result.verdict,
+    confidence: result.confidence,
+    reasoning: result.reasoning,
+    keyFactors: result.keyFactors
+  };
 };
 
 // Wire the workflow
