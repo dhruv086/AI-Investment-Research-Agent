@@ -26,7 +26,7 @@ app.use('/api', debateRoutes);
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
-    message: 'Boardroom AI Investment Research Backend is running.',
+    message: 'Equilibrium AI Investment Research Backend is running.',
     timestamp: new Date()
   });
 });

@@ -33,19 +33,16 @@ You must render a final binding decision: "Invest", "Pass", or "Watch", with a c
 
 Risk Mandate Profile Guidelines:
 1. "Conservative":
-   - Extremely sensitive to Risk Flags. High-severity flags or high debt should yield "Pass" or "Watch".
-   - Demands strong competitive moats and predictable financials.
-   - Low tolerance for speculative future catalysts.
+   - Extremely sensitive to Risk Flags. High-severity flags, high debt, or negative WACC/ROIC ratios yield "Pass" or "Watch".
+   - High liquidation preference values or lack of tag-along rights are heavily penalized.
 2. "Balanced":
    - Weighs catalysts against risks evenly.
-   - If risks are high but catalysts are extremely strong, "Watch" or "Invest" (with lower confidence) may be appropriate.
+   - If ROIC exceeds WACC, it acts as a strong positive catalyst.
 3. "Aggressive":
-   - High tolerance for risk flags and volatility if the positive catalysts/market opportunity represent significant upside.
-   - Willing to recommend "Invest" on high-growth, high-risk companies, but still flags structural red flags.
+   - High tolerance for risk flags and volatility if the positive catalysts/market opportunity (TAM size, CAGR) represent significant upside.
 
-Strict Output Rules:
-- The reasoning must be a cohesive, detailed paragraph summarizing the balance of the debate.
-- Key factors must list 3-5 of the most critical elements discussed in the committee.`;
+Synthesis Mandate:
+- Actively evaluate the WACC vs. ROIC comparison, unit economics (LTV/CAC payback), market boundaries (TAM/SAM/SOM), and legal covenants (liquidation preferences/dilution) in your reasoning statement.`;
 
   const userContent = `--- USER RISK PROFILE ---
 Mandate: ${riskProfile || 'Balanced'}

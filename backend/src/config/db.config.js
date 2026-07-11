@@ -1,8 +1,12 @@
 import mongoose from 'mongoose';
+import dns from 'dns';
+
+// Force DNS lookup ordering to resolve SRV records properly in Node.js on Windows
+dns.setDefaultResultOrder('ipv4first');
 
 const connectDB = async () => {
   try {
-    const connUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/boardroom';
+    const connUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/equilibrium';
     const conn = await mongoose.connect(connUri);
     console.log(`MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {

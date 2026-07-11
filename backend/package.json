@@ -1,7 +1,7 @@
 {
-  "name": "boardroom-backend",
+  "name": "equilibrium-backend",
   "version": "1.0.0",
-  "description": "Backend engine for Boardroom AI Investment Research Agent",
+  "description": "Backend engine for Equilibrium AI Investment Research Agent",
   "main": "index.js",
   "type": "module",
   "scripts": {

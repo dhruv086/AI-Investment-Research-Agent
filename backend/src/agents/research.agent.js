@@ -9,7 +9,6 @@ import DossierSchema from '../schemas/dossier.schema.js';
 const resolveTicker = async (companyName) => {
   const cleanInput = companyName.trim();
   
-  // If it's already a potential ticker (1 to 5 letters)
   if (/^[A-Z]{1,5}$/i.test(cleanInput)) {
     return cleanInput.toUpperCase();
   }
@@ -55,10 +54,14 @@ export const runResearchAgent = async (state) => {
   const ticker = await resolveTicker(companyName);
   console.log(`ResearchAgent: Ticker resolved to "${ticker}".`);
 
-  // 2. Fetch news and fundamentals in parallel
+  // 2. Fetch news (with expanded queries) and fundamentals in parallel
   console.log(`ResearchAgent: Fetching news & fundamentals data in parallel for "${ticker}"...`);
+  
+  // Construct a specialized query focusing on the required financial, legal, and growth terms
+  const searchCompanyQuery = `${companyName} recent financial performance, TAM, WACC, customer acquisition cost CAC, LTV, CAGR, and funding deal terms`;
+
   const [newsResults, fundamentals] = await Promise.all([
-    searchCompanyNews(companyName),
+    searchCompanyNews(searchCompanyQuery),
     ticker !== 'GENERIC' ? fetchCompanyOverview(ticker) : Promise.resolve(null)
   ]);
 
@@ -90,14 +93,18 @@ export const runResearchAgent = async (state) => {
     name: "DossierExtractor"
   });
 
-  const systemMessage = `You are the ResearchAgent, an elite, unbiased financial intelligence collector.
+  const systemMessage = `You are the ResearchAgent, an elite financial intelligence collector.
 Your mandate is to compile a highly structured, facts-only "dossier" on the target company.
 You must synthesize the raw News Search Results and Fundamentals Data provided below.
 
 Strict Constraints:
-- FACTS ONLY. Do not write opinions, evaluations, recommendations, or qualitative comments (e.g. write "Revenue grew 10%" instead of "Revenue had a fantastic growth").
+- FACTS ONLY. Do not write opinions, evaluations, recommendations, or qualitative comments.
+- Populate all fields in:
+  1. financialValuationMetrics (EBITDA, Gross Margin, Free Cash Flow, etc. Calculate or extract them where possible).
+  2. dealLegalTerms (For public companies, set terms like Liquidation Preference to 'Public Equity Standard' or null if not applicable. For private startups, extract details regarding their valuation, preferences, or vesting if found in the news).
+  3. marketGrowthTerms (Extract or estimate TAM, SAM, SOM, CAGR, Churn, and Unit Economics).
+  4. performanceReturnMetrics (Extract or estimate ROIC, WACC, IRR, MOIC, etc.).
 - Ensure all recentNews items contain strictly factual descriptions of business events (earnings reports, product releases, executive changes, regulatory audits, lawsuits).
-- Extract financial metrics for keyMetrics. If Alpha Vantage data is missing, extract them from the news context or estimate them using your financial knowledge, leaving them null/empty if completely unknown.
 - Do not make recommendations to invest or pass. Your job is data assembly.`;
 
   const userContent = `Company Name Request: ${companyName} (Ticker: ${ticker})

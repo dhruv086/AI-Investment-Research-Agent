@@ -18,7 +18,7 @@ export const runBullAgent = async (state) => {
   const model = new ChatGroq({
     apiKey: groqKey,
     model: "llama-3.3-70b-versatile",
-    temperature: 0.7 // slightly higher temperature to encourage synthesis of arguments
+    temperature: 0.7
   });
 
   const structuredLlm = model.withStructuredOutput(BullCaseSchema, {
@@ -29,8 +29,13 @@ export const runBullAgent = async (state) => {
 Your sole job is to make the strongest possible good-faith investment case FOR this company based ONLY on the provided factual dossier.
 
 Rules:
-- Focus on growth vectors, product dominance, competitive moats, market share gains, and strong financial numbers.
-- Maintain high professionalism. While positive, avoid groundless hype and stick to facts in the dossier to support your thesis.
+- Actively evaluate and cite the expanded financial, market, and performance metrics if available:
+  - Strong Free Cash Flow (FCF) conversion and high Gross Margins.
+  - Value creation (ROIC exceeding WACC).
+  - Strong Unit Economics (high LTV/CAC ratios, rapid Payback Periods).
+  - Large Total Addressable Market (TAM) and secular growth rates (CAGR).
+  - moats supporting scaling (Network Effects).
+- Keep arguments grounded strictly in the dossier facts. Avoid groundless hype.
 - You must not refer to or assume any counterarguments or bear cases.`;
 
   const userContent = `Here is the factual Research Dossier for the target company:

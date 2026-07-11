@@ -1,6 +1,7 @@
 /**
  * Alpha Vantage Fundamentals Tool Wrapper.
- * Fetches core balance sheet and valuation metrics for a given stock symbol.
+ * Fetches company overview, income statements, balance sheets, and cash flows.
+ * Calculates EBITDA, Free Cash Flow, and Working Capital.
  * Degrades gracefully if key is missing, rate-limit is hit, or the symbol is invalid.
  */
 export const fetchCompanyOverview = async (symbol) => {
@@ -11,48 +12,110 @@ export const fetchCompanyOverview = async (symbol) => {
     return null;
   }
 
-  // Ensure we have a clean ticker symbol (uppercase, trimmed)
   const cleanSymbol = symbol.trim().toUpperCase();
+  const dataStore = {
+    overview: null,
+    income: null,
+    balance: null,
+    cashflow: null
+  };
+
+  // Helper fetcher to catch rate limits
+  const fetchEndpoint = async (func) => {
+    try {
+      const url = `https://www.alphavantage.co/query?function=${func}&symbol=${cleanSymbol}&apikey=${apiKey}`;
+      const response = await fetch(url);
+      if (!response.ok) return null;
+      const json = await response.json();
+      if (json.Note || json.Information) {
+        console.warn(`Alpha Vantage rate limit reached on endpoint "${func}".`);
+        return 'LIMIT';
+      }
+      return json;
+    } catch (err) {
+      console.error(`Error querying Alpha Vantage endpoint ${func}: ${err.message}`);
+      return null;
+    }
+  };
 
   try {
-    const url = `https://www.alphavantage.co/query?function=OVERVIEW&symbol=${cleanSymbol}&apikey=${apiKey}`;
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      console.warn(`Alpha Vantage API returned status: ${response.status}. Degrading gracefully.`);
+    // 1. Fetch Overview (primary)
+    console.log(`Alpha Vantage: Querying OVERVIEW for "${cleanSymbol}"...`);
+    const overviewData = await fetchEndpoint('OVERVIEW');
+    if (overviewData === 'LIMIT' || !overviewData || !overviewData.Symbol) {
       return null;
     }
+    dataStore.overview = overviewData;
 
-    const data = await response.json();
-
-    // Alpha Vantage returns a message when rate limit (5 API calls per minute) is hit
-    if (data.Note || data.Information) {
-      console.warn('Alpha Vantage free-tier rate limit reached. Degrading gracefully to no-persistence/no-data mode.');
-      return null;
+    // 2. Fetch Income Statement
+    console.log(`Alpha Vantage: Querying INCOME_STATEMENT for "${cleanSymbol}"...`);
+    const incomeData = await fetchEndpoint('INCOME_STATEMENT');
+    if (incomeData && incomeData !== 'LIMIT') {
+      dataStore.income = incomeData;
     }
 
-    // If we get an empty object or it doesn't match a stock Overview
-    if (!data.Symbol) {
-      console.warn(`Alpha Vantage returned no data for symbol: ${cleanSymbol}. Symbol might not be found.`);
-      return null;
+    // 3. Fetch Balance Sheet
+    console.log(`Alpha Vantage: Querying BALANCE_SHEET for "${cleanSymbol}"...`);
+    const balanceData = await fetchEndpoint('BALANCE_SHEET');
+    if (balanceData && balanceData !== 'LIMIT') {
+      dataStore.balance = balanceData;
     }
 
-    // Map Alpha Vantage response fields to our metrics schema
-    return {
-      companyName: data.Name || null,
-      ticker: data.Symbol || null,
-      businessOverview: data.Description || null,
-      sector: data.Sector || null,
-      marketCap: data.MarketCapitalization ? `$${(parseInt(data.MarketCapitalization) / 1e9).toFixed(2)} Billion` : null,
-      peRatio: data.PERatio || null,
-      eps: data.EarningsPerShare || null,
-      dividendYield: data.DividendYield ? `${(parseFloat(data.DividendYield) * 100).toFixed(2)}%` : null,
-      profitMargin: data.ProfitMargin ? `${(parseFloat(data.ProfitMargin) * 100).toFixed(2)}%` : null,
-      operatingMargin: data.OperatingMarginTTM ? `${(parseFloat(data.OperatingMarginTTM) * 100).toFixed(2)}%` : null,
-      revenueTTM: data.RevenueTTM ? `$${(parseInt(data.RevenueTTM) / 1e9).toFixed(2)} Billion` : null
-    };
+    // 4. Fetch Cash Flow
+    console.log(`Alpha Vantage: Querying CASH_FLOW for "${cleanSymbol}"...`);
+    const cashData = await fetchEndpoint('CASH_FLOW');
+    if (cashData && cashData !== 'LIMIT') {
+      dataStore.cashflow = cashData;
+    }
+
+    // Process gathered statistics
+    const metrics = {};
+    const overview = dataStore.overview;
+    
+    // Base overview parameters
+    metrics.companyName = overview.Name || null;
+    metrics.ticker = overview.Symbol || null;
+    metrics.businessOverview = overview.Description || null;
+    metrics.sector = overview.Sector || null;
+    metrics.marketCap = overview.MarketCapitalization ? `$${(parseInt(overview.MarketCapitalization) / 1e9).toFixed(2)} Billion` : null;
+    metrics.peRatio = overview.PERatio || null;
+    metrics.eps = overview.EarningsPerShare || null;
+    metrics.dividendYield = overview.DividendYield ? `${(parseFloat(overview.DividendYield) * 100).toFixed(2)}%` : null;
+    metrics.profitMargin = overview.ProfitMargin ? `${(parseFloat(overview.ProfitMargin) * 100).toFixed(2)}%` : null;
+    metrics.operatingMargin = overview.OperatingMarginTTM ? `${(parseFloat(overview.OperatingMarginTTM) * 100).toFixed(2)}%` : null;
+    metrics.revenueTTM = overview.RevenueTTM ? `$${(parseInt(overview.RevenueTTM) / 1e9).toFixed(2)} Billion` : null;
+
+    // Estimate EBITDA from Income Statement (EBITDA = Operating Income + Depreciation & Amortization)
+    if (dataStore.income?.annualReports?.length > 0) {
+      const recentReport = dataStore.income.annualReports[0];
+      const operatingIncome = parseInt(recentReport.operatingIncome) || 0;
+      const ebit = parseInt(recentReport.ebit) || operatingIncome;
+      const depreciation = parseInt(recentReport.depreciationAndAmortization) || 0;
+      const ebitdaVal = ebit + depreciation;
+      metrics.ebitda = ebitdaVal ? `$${(ebitdaVal / 1e9).toFixed(2)} Billion` : null;
+    }
+
+    // Working Capital from Balance Sheet (Working Capital = Current Assets - Current Liabilities)
+    if (dataStore.balance?.annualReports?.length > 0) {
+      const recentReport = dataStore.balance.annualReports[0];
+      const currentAssets = parseInt(recentReport.totalCurrentAssets) || 0;
+      const currentLiabilities = parseInt(recentReport.totalCurrentLiabilities) || 0;
+      const wcVal = currentAssets - currentLiabilities;
+      metrics.workingCapital = wcVal ? `$${(wcVal / 1e9).toFixed(2)} Billion` : null;
+    }
+
+    // Free Cash Flow from Cash Flow statement (FCF = Operating Cash Flow - CapEx)
+    if (dataStore.cashflow?.annualReports?.length > 0) {
+      const recentReport = dataStore.cashflow.annualReports[0];
+      const operatingCashflow = parseInt(recentReport.operatingCashflow) || 0;
+      const capitalExpenditures = parseInt(recentReport.capitalExpenditures) || 0;
+      const fcfVal = operatingCashflow - capitalExpenditures;
+      metrics.freeCashFlow = fcfVal ? `$${(fcfVal / 1e9).toFixed(2)} Billion` : null;
+    }
+
+    return metrics;
   } catch (error) {
-    console.error(`Error fetching Alpha Vantage data: ${error.message}. Degrading gracefully.`);
+    console.error(`Error processing Alpha Vantage datasets: ${error.message}. Degrading gracefully.`);
     return null;
   }
 };

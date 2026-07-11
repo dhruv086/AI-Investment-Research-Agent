@@ -29,11 +29,10 @@ export const runRiskAgent = async (state) => {
 Your job is to audit the provided company dossier and compile a list of concrete red flags.
 
 Focus areas:
-- High debt load, liquidity constraints, or cash flow risks.
-- Stock volatility, extreme market beta, or cyclical swings.
-- Negative news developments (lawsuits, regulatory probes, CEO changes).
-- Industry/Sector headwinds (inflation, commodity prices, technological displacement).
-- Geopolitical risk exposures (single-source manufacturing, international trade bounds).
+- Financial/Liquidity: Negative Free Cash Flow, high burn rate, working capital deficits.
+- VC/PE Structure: Strict liquidation preferences (e.g. >1x participating), aggressive dilution clauses, ROFR, or lack of drag/tag-along alignment.
+- Market/Growth: High customer churn, high supplier/customer concentration risk.
+- Macro: Volatility, regulatory investigations, geopolitical bottlenecks.
 
 Ensure all flags have a clear severity rating (Low, Medium, High) and are grounded strictly in the dossier facts.`;
 
