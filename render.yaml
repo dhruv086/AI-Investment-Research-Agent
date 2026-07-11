@@ -2,6 +2,7 @@ services:
   - type: web
     name: equilibrium-ai
     runtime: node
+    plan: free
     buildCommand: npm run build
     startCommand: npm start
     envVars:
