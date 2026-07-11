@@ -97,3 +97,18 @@ _The client will boot the Vite dev server, typically at `http://localhost:5173`.
   - Action: Lists all historical debate sessions.
 - `GET /api/sessions/:id`
   - Action: Retrieves a specific session's full debate case data.
+
+---
+
+## Deployment (Render Blueprint)
+
+This project is pre-configured with a `render.yaml` blueprint for one-click deployment.
+
+To deploy it to **Render**:
+1. Push your monorepo code to a **GitHub** repository.
+2. Go to your [Render Dashboard](https://dashboard.render.com/) and click **New +** > **Blueprint**.
+3. Select and connect your repository.
+4. Render will automatically parse `render.yaml` and set up the Unified Express Hosting service.
+5. Fill in the values for the prompted environment variables (`MONGODB_URI`, `GROQ_API_KEY`, `TAVILY_API_KEY`, and optional `ALPHA_VANTAGE_API_KEY`).
+6. Click **Apply** to initiate the deployment.
+
