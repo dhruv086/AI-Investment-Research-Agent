@@ -1,6 +1,8 @@
+import { debateGraph } from '../graphs/debate.graph.js';
+
 /**
- * Placeholder controller for Research Agent committee execution.
- * Echoes back the request parameters.
+ * Controller to trigger the LangGraph.js investment committee debate graph.
+ * Executes Research, Bull, Bear, and Risk agents, returning the complete analysis.
  */
 export const runResearchDebate = async (req, res) => {
   try {
@@ -12,18 +14,30 @@ export const runResearchDebate = async (req, res) => {
       });
     }
 
-    // Echo back body parameters along with simulated response flag
+    console.log(`Research Controller: Triggering debate graph run for "${companyName}" (${riskProfile})...`);
+    
+    // Invoke the compiled LangGraph
+    const finalState = await debateGraph.invoke({
+      companyName,
+      riskProfile
+    });
+
+    console.log(`Research Controller: Debate graph finished execution.`);
+
+    // Return aggregated results
     return res.status(200).json({
-      message: 'Scaffolding echo success. Target parsed.',
-      received: {
-        companyName,
-        riskProfile
-      },
-      status: 'pending_agent_integration_in_phase_2'
+      message: 'Committee debate run complete.',
+      companyName,
+      riskProfile,
+      dossier: finalState.dossier,
+      bullCase: finalState.bullCase,
+      bearCase: finalState.bearCase,
+      riskFlags: finalState.riskFlags
     });
   } catch (error) {
+    console.error(`Research Controller Error: ${error.message}`);
     return res.status(500).json({
-      error: `Internal server error: ${error.message}`
+      error: `Failed to execute debate graph: ${error.message}`
     });
   }
 };
