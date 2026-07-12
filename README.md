@@ -2,7 +2,10 @@
 
 An AI investment research agent that takes a company name and a risk mandate, runs a simulated investment-committee debate between four specialized AI agents, and returns a final `Invest` / `Pass` / `Watch` verdict with a confidence score and reasoning.
 
+**In one line:** this isn't a single-prompt "yes/no" bot — Bull, Bear, and Risk agents debate a shared factual dossier in parallel with no visibility into each other's arguments, and a Judge synthesizes a verdict whose confidence % is computed deterministically from their sub-scores, not just guessed.
+
 **Live app:** https://equilibrium-ai-uhay.onrender.com/
+**Repo:** https://github.com/dhruv086/AI-Investment-Research-Agent
 
 > Note: the live link is hosted on Render's free tier. If it's been idle, the **first request can take 30–60 seconds** while the instance spins back up — this is a hosting-tier limitation, not a bug.
 
@@ -121,24 +124,54 @@ The Research Agent resolves a company name to a ticker (via a fast, low-temperat
 Each is a separate LLM call (temperature 0.7 for Bull/Bear to allow persuasive framing, 0.2 for Risk to keep it precise) against the *same* dossier, each with a Zod-structured output schema and a system prompt that explicitly forbids referencing the other agents' arguments. This isolation is the core design decision that makes the debate meaningful rather than one model agreeing with itself three times.
 
 ### Judge agent and the verdict
-The Judge (temperature 0.2, for consistency) receives the Bull case, Bear case, Risk flags, and the user's risk mandate as JSON, and produces a structured verdict via a Zod schema:
+The Judge (temperature 0.2, for consistency) receives the Bull case, Bear case, Risk flags, and the user's risk mandate as JSON. It produces the qualitative parts of the verdict via a Zod schema:
 
 ```js
 {
   verdict: "Invest" | "Pass" | "Watch",
-  confidence: number (0-100),
   reasoning: string,
   keyFactors: string[]
 }
 ```
 
-**How the confidence percentage is produced — to be precise about this:** the confidence score is **not** computed by a deterministic formula in code. It is the Judge LLM's own self-assessed confidence in its verdict, constrained to a 0–100 numeric range by the output schema, generated *after* it has explicitly reasoned through the Bull case, Bear case, and Risk audit against the selected mandate. The system prompt requires the model to ground that reasoning in the specific metrics provided (ROIC vs. WACC, LTV/CAC, TAM/CAGR, liquidation preferences), so the number isn't arbitrary — but it is a language-model judgment call, not an arithmetic score. This is a legitimate and common pattern for LLM-based decision systems, but it's worth being upfront about rather than implying a formula exists.
+**How the confidence percentage is actually calculated:** the numeric confidence is **not** left to the LLM to self-report. Each debate agent first emits its own bounded sub-score as part of its structured output — `bullCase.strengthScore` (0–100, how strong the FOR case is), `bearCase.strengthScore` (0–100, how strong the AGAINST case is), and `riskFlags.severityScore` (0–100, aggregate severity of audited red flags). The Judge agent then computes the final confidence **in code**, deterministically, from those three sub-scores plus the user's risk mandate:
+
+```js
+const mandateWeights = { Conservative: 1.5, Balanced: 1.0, Aggressive: 0.5 };
+const mandateWeight = mandateWeights[riskProfile];
+
+const netStrength = bullStrength - bearStrength;
+const riskPenalty  = riskSeverity * mandateWeight;
+
+if (verdict === 'Invest') confidence = netStrength - riskPenalty;
+else if (verdict === 'Pass') confidence = bearStrength - bullStrength + riskPenalty;
+else /* Watch */ confidence = 100 - Math.abs(netStrength) - riskPenalty;
+
+confidence = clamp(round(confidence), 0, 100);
+```
+
+So a Conservative mandate weighs risk severity 3x more heavily than an Aggressive one when penalizing confidence — which mirrors how the Judge's own verdict-level reasoning is instructed to behave (Conservative mandates are told to be "extremely sensitive to Risk Flags," Aggressive mandates are told to tolerate them). The verdict category itself (Invest/Pass/Watch) and the written reasoning still come from the LLM's holistic read of the debate — only the final percentage is a deterministic function of the three sub-scores, which makes it auditable: given the three inputs and the mandate, the confidence number can be recomputed and checked by hand rather than taken on faith.
 
 ### Persistence and degraded mode
 Every completed debate is saved to MongoDB (`debateSession.model.js`). If Mongo isn't reachable, the API still returns the full result to the user — it just skips persistence and returns a "degraded mode" message rather than failing the request. The `/api/sessions` endpoints return a `503` if the DB is offline instead of crashing.
 
 ### Frontend
-A single-page React (Vite) app: company/risk-mandate input, a staged loading indicator (Research → Parallel debate → Judge) so the user sees the pipeline progressing rather than a blank spinner, a verdict dashboard, and a sidebar of past sessions pulled from `/api/sessions`.
+A React (Vite) single-page app, structured as components rather than one monolithic file:
+
+```
+frontend/src/
+  hooks/useDebate.js         → all state + API calls (search, trigger debate, load session)
+  components/
+    CompanySearchForm.jsx    → company name input + risk mandate selector
+    LoadingProgress.jsx      → staged loading indicator (Research → Parallel Agents → Judge)
+    VerdictCard.jsx          → verdict / confidence / reasoning banner
+    DebateDossierView.jsx    → dossier, bull/bear cases, and risk audit detail view
+    SessionSidebar.jsx       → history of past debate sessions
+    ErrorBanner.jsx          → error state display
+  App.jsx                    → layout/composition only, wires the hook to the components
+```
+
+`App.jsx` composes the page and holds no business logic itself — all state and API calls live in the `useDebate` hook, and each visual section is its own component. This keeps loading states, error states, and result rendering independently readable instead of one large file mixing all of it together.
 
 ---
 
@@ -150,9 +183,9 @@ A single-page React (Vite) app: company/risk-mandate input, a staged loading ind
 | **Facts-only dossier, isolated Bull/Bear/Risk agents** | Prevents the debate from collapsing into one model agreeing with itself; makes the reasoning traceable back to specific facts | More LLM calls per run (5 total) → higher latency and cost than a single-shot prompt |
 | **LLM-based ticker resolution instead of a symbol-lookup API/database** | Fast to build, works for well-known public companies out of the box | Can misresolve or hallucinate a ticker for smaller/private companies, silently degrading fundamentals quality — flagged as a known limitation |
 | **Alpha Vantage marked optional, app degrades gracefully without it** | Free tier is heavily rate-limited (5 req/min, 25/day); didn't want a rate-limit hit to break the whole pipeline | Fundamentals section of the dossier can be thin/absent for some runs, more reliance on Tavily news |
-| **Confidence as LLM self-assessment, not a weighted formula** | Simpler to build within the time box; still grounded by structured reasoning inputs | Less explainable/auditable than a rules-based scoring engine; noted above as the top thing I'd improve |
+| **Confidence computed in code from agent sub-scores, not left as a raw LLM number** | Each of Bull/Bear/Risk emits a bounded `strengthScore`/`severityScore`; the Judge combines them with a mandate-weighted formula so the final % is deterministic and auditable, not just "whatever the model said" | The sub-scores themselves are still LLM-assigned (just narrower and more constrained than a single holistic guess) — a further iteration could cross-check them against the dossier's actual numeric metrics |
 | **No auth / rate limiting on the API** | Out of scope for a single-user take-home demo | Not production-safe as-is; anyone with the URL can call `/api/research` and spend API credits |
-| **Single monolithic `App.jsx` on the frontend** | Got a working, deployed UI within the time box | Not decomposed into components — the first thing I'd refactor with more time |
+| **Frontend split into components + a `useDebate` hook rather than kept as one file** | Keeps state/API logic (hook) separate from presentation (components), easier to read and extend | Slightly more files to navigate for a project this size, but pays off as the UI grows |
 | **Deployed as one Express service serving the built React app** (rather than separate frontend/backend hosts) | Simpler single free-tier Render deployment, avoids CORS/env-var complexity across two hosts | Render free tier cold-starts and has no autoscaling |
 
 ---
@@ -183,14 +216,13 @@ A single-page React (Vite) app: company/risk-mandate input, a staged loading ind
 
 ## 6. What I would improve with more time
 
-1. **Make the confidence score explainable, not just self-reported** — have Bull/Bear/Risk each emit a bounded strength/severity score, and derive the final confidence in code as a weighted function of those plus the risk mandate, rather than relying solely on the Judge's own number.
-2. **Decompose the frontend** into proper components (`CompanySearchForm`, `VerdictCard`, `DebatePanel`, `SessionSidebar`) instead of one large `App.jsx`, and add basic loading/error states per section.
-3. **Replace LLM-guessed ticker resolution** with a real symbol-lookup API (or a static exchange listing) and only fall back to the LLM for unlisted/private companies.
-4. **Add caching** for repeated company lookups within a short window, to reduce Tavily/Alpha Vantage/Groq calls and cost.
-5. **Add basic rate limiting and an API key/auth layer** before this could be exposed publicly beyond a demo.
-6. **Add automated tests** around the graph nodes (mocking the LLM/tool calls) so agent-prompt changes don't silently break structured-output parsing.
-7. **Benchmark verdict quality across LLM providers** (Groq/Llama vs. GPT vs. Claude vs. Gemini) since the JD's production stack includes several of these — worth knowing which gives the most reliable structured reasoning for this specific task.
-8. **Surface tool degradation to the user** — right now if Alpha Vantage rate-limits or Tavily returns nothing, the run still completes silently on partial data; a small UI badge ("fundamentals unavailable for this run") would make that visible instead of hidden.
+1. **Cross-check the agent sub-scores against the dossier's actual numeric metrics** — `strengthScore`/`severityScore` are still LLM-assigned; a further version could partially validate them in code (e.g. penalize a high bull `strengthScore` if ROIC < WACC in the dossier) to make the confidence formula even less dependent on the model "grading itself."
+2. **Replace LLM-guessed ticker resolution** with a real symbol-lookup API (or a static exchange listing) and only fall back to the LLM for unlisted/private companies.
+3. **Add caching** for repeated company lookups within a short window, to reduce Tavily/Alpha Vantage/Groq calls and cost.
+4. **Add basic rate limiting and an API key/auth layer** before this could be exposed publicly beyond a demo.
+5. **Add automated tests** around the graph nodes (mocking the LLM/tool calls) so agent-prompt changes don't silently break structured-output parsing, and unit tests for the confidence formula itself given fixed sub-score inputs.
+6. **Benchmark verdict quality across LLM providers** (Groq/Llama vs. GPT vs. Claude vs. Gemini) since the JD's production stack includes several of these — worth knowing which gives the most reliable structured reasoning for this specific task.
+7. **Surface tool degradation to the user** — right now if Alpha Vantage rate-limits or Tavily returns nothing, the run still completes silently on partial data; a small UI badge ("fundamentals unavailable for this run") would make that visible instead of hidden.
 
 ---
 
