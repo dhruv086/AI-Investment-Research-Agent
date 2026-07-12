@@ -192,25 +192,19 @@ frontend/src/
 
 ## 5. Example runs
 
-*(Replace the placeholders below with 2–3 actual runs from the live app before submitting — screenshot or paste the JSON response from `/api/research` for each.)*
+### Example 1 — Zomato, Balanced mandate
+- **Verdict:** Watch
+- **Confidence:** 60%
+- **Key factors:** Growing net order value; highly competitive environment; lack of financial transparency; significant losses after tax; potential liquidity issues
+- **Reasoning (summary):** Zomato's growth trajectory (net order value up from ₹27,735 Cr to ₹61,852 Cr over three years) and its recent $250M round at a $5.4B valuation are genuine positive catalysts, but they're weighed against real losses after tax (₹35 Cr / ₹56 Cr for the quarter/nine-months ended Dec 2024) and missing transparency on core metrics like EBITDA and gross margin. Under a Balanced mandate this nets out to neither a clear buy nor a clear pass — hence Watch, pending more visibility on profitability.
 
-### Example 1 — NVIDIA, Balanced mandate
-- **Verdict:** _e.g. Invest_
-- **Confidence:** _e.g. 78%_
-- **Key factors:** _paste 3–5 from the actual run_
-- **Reasoning (summary):** _paste 2–3 sentences from the actual `reasoning` field_
+### Example 2 — Paytm, Conservative mandate
+- **Verdict:** Pass
+- **Confidence:** 80%
+- **Key factors:** High burn rate (₹2,334 Cr); compressed gross margins (75.2%); lack of profitability historically; high customer acquisition cost (₹2,342 Cr)
+- **Reasoning (summary):** Paytm shows real revenue growth (25% YoY in Q4 FY24, 100% YoY growth in financial-services distribution revenue in Q1 FY26) and international expansion, but the Conservative mandate is deliberately unforgiving of the high burn rate and unresolved unit economics (LTV/CAC payback not established). Since ROIC vs. WACC and working capital data aren't available to confirm capital efficiency, the system defaults to capital preservation — hence a high-confidence Pass rather than a hedge.
 
-### Example 2 — [a smaller/private company], Conservative mandate
-- **Verdict:**
-- **Confidence:**
-- **Key factors:**
-- **Reasoning (summary):**
-
-### Example 3 — [a company you expect a "Watch" or "Pass" result for], Aggressive mandate
-- **Verdict:**
-- **Confidence:**
-- **Key factors:**
-- **Reasoning (summary):**
+*(A third run showing an "Invest" verdict would round this out nicely — happy to add one once available.)*
 
 ---
 
@@ -228,4 +222,6 @@ frontend/src/
 
 ## 7. AI tools used while building this
 
-As instructed by the assignment, AI was used throughout. Tools used: **Claude**, **ChatGPT**, **Kimi**, and **Antigravity** for planning, code generation, debugging, and architecture review, alongside **Groq** as the production LLM provider, **Tavily** for web search, and **Alpha Vantage** for financial fundamentals. Chat session transcripts/logs are included per the bonus-points instructions in `[transcripts folder/link — add path]`.
+As instructed by the assignment, AI was used throughout — for planning, code generation, debugging, and architecture review. Tools used: **Claude**, **ChatGPT**, **Kimi**, and **Antigravity** (which drove most of the implementation and refactoring), alongside **Groq** as the production LLM provider, **Tavily** for web search, and **Alpha Vantage** for financial fundamentals.
+
+I did not keep saved chat session transcripts/logs from these sessions, so I'm not able to submit them for the bonus points. I can, however, walk through and explain every design decision, trade-off, and piece of code in this project in the interview — the "How it works" and "Key decisions & trade-offs" sections above reflect my own understanding of what was built and why, not a copy of anything an AI said.
