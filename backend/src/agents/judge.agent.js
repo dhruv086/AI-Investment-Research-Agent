@@ -29,7 +29,7 @@ export const runJudgeAgent = async (state) => {
 
   const systemMessage = `You are the JudgeAgent, the presiding chair of the AI Investment Committee.
 Your job is to receive the BullAgent arguments (FOR investing), the BearAgent arguments (AGAINST investing), the RiskAgent audited flags, and the user's selected Risk Mandate Profile.
-You must render a final binding decision: "Invest", "Pass", or "Watch", with a confidence rating (0-100), reasoning, and key factors.
+You must render a final binding decision: "Invest", "Pass", or "Watch", with reasoning and key factors.
 
 Risk Mandate Profile Guidelines:
 1. "Conservative":
@@ -62,10 +62,37 @@ ${JSON.stringify(riskFlags, null, 2)}`;
     { role: "user", content: userContent }
   ]);
 
-  console.log(`JudgeAgent: Verdict rendered: ${verdict.verdict} (Confidence: ${verdict.confidence}%)`);
+  // Compute explainable confidence in code based on sub-scores and risk profiles
+  const bullStrength = bullCase.strengthScore || 0;
+  const bearStrength = bearCase.strengthScore || 0;
+  const riskSeverity = riskFlags.severityScore || 0;
+
+  const mandateWeights = {
+    'Conservative': 1.5,
+    'Balanced': 1.0,
+    'Aggressive': 0.5
+  };
+  const mandateWeight = mandateWeights[riskProfile] !== undefined ? mandateWeights[riskProfile] : 1.0;
+
+  let computedConfidence = 0;
+  const netStrength = bullStrength - bearStrength;
+  const riskPenalty = riskSeverity * mandateWeight;
+
+  if (verdict.verdict === 'Invest') {
+    computedConfidence = netStrength - riskPenalty;
+  } else if (verdict.verdict === 'Pass') {
+    computedConfidence = bearStrength - bullStrength + riskPenalty;
+  } else { // 'Watch'
+    computedConfidence = 100 - Math.abs(netStrength) - riskPenalty;
+  }
+
+  // Clamp and round between 0 and 100
+  computedConfidence = Math.max(0, Math.min(100, Math.round(computedConfidence)));
+
+  console.log(`JudgeAgent: Verdict rendered: ${verdict.verdict} (Computed Confidence: ${computedConfidence}%)`);
   return {
     verdict: verdict.verdict,
-    confidence: verdict.confidence,
+    confidence: computedConfidence,
     reasoning: verdict.reasoning,
     keyFactors: verdict.keyFactors
   };
