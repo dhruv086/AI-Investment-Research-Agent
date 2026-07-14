@@ -79,11 +79,11 @@ ${JSON.stringify(riskFlags, null, 2)}`;
   const riskPenalty = riskSeverity * mandateWeight;
 
   if (verdict.verdict === 'Invest') {
-    computedConfidence = netStrength - riskPenalty;
+    computedConfidence = bullStrength - (bearStrength * 0.4) - (riskPenalty * 0.6);
   } else if (verdict.verdict === 'Pass') {
-    computedConfidence = bearStrength - bullStrength + riskPenalty;
+    computedConfidence = bearStrength - (bullStrength * 0.4) + (riskPenalty * 0.6);
   } else { // 'Watch'
-    computedConfidence = 100 - Math.abs(netStrength) - riskPenalty;
+    computedConfidence = 100 - Math.abs(netStrength) - (riskPenalty * 0.6);
   }
 
   // Clamp and round between 0 and 100

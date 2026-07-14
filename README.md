@@ -134,7 +134,7 @@ The Judge (temperature 0.2, for consistency) receives the Bull case, Bear case, 
 }
 ```
 
-**How the confidence percentage is actually calculated:** the numeric confidence is **not** left to the LLM to self-report. Each debate agent first emits its own bounded sub-score as part of its structured output — `bullCase.strengthScore` (0–100, how strong the FOR case is), `bearCase.strengthScore` (0–100, how strong the AGAINST case is), and `riskFlags.severityScore` (0–100, aggregate severity of audited red flags). The Judge agent then computes the final confidence **in code**, deterministically, from those three sub-scores plus the user's risk mandate:
+**How the confidence percentage is actually calculated:** the numeric confidence is **not** left to the LLM to self-report. Each debate agent first emits its own bounded sub-score as part of its structured output — `bullCase.strengthScore` (0–100, how strong the FOR case is), `bearCase.strengthScore` (0–100, how strong the AGAINST case is), and `riskFlags.severityScore` (0–100, aggregate severity of audited red flags). The Judge agent then computes the final confidence **in code**, deterministically, from those three sub-scores plus the user's risk mandate using a weighted formula to avoid confidence collapsing to 0% when there are strong, competing arguments on both sides:
 
 ```js
 const mandateWeights = { Conservative: 1.5, Balanced: 1.0, Aggressive: 0.5 };
@@ -143,9 +143,13 @@ const mandateWeight = mandateWeights[riskProfile];
 const netStrength = bullStrength - bearStrength;
 const riskPenalty  = riskSeverity * mandateWeight;
 
-if (verdict === 'Invest') confidence = netStrength - riskPenalty;
-else if (verdict === 'Pass') confidence = bearStrength - bullStrength + riskPenalty;
-else /* Watch */ confidence = 100 - Math.abs(netStrength) - riskPenalty;
+if (verdict === 'Invest') {
+  confidence = bullStrength - (bearStrength * 0.4) - (riskPenalty * 0.6);
+} else if (verdict === 'Pass') {
+  confidence = bearStrength - (bullStrength * 0.4) + (riskPenalty * 0.6);
+} else { // Watch
+  confidence = 100 - Math.abs(netStrength) - (riskPenalty * 0.6);
+}
 
 confidence = clamp(round(confidence), 0, 100);
 ```
